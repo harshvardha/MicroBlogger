@@ -13,12 +13,8 @@ values(
 returning id, username, profile_pic_url, role_id, created_at, updated_at;
 
 -- name: UpdateUsername :one
-update users set username = $1, updated_at = NOW() where id = $2
+update users set username = $1, profile_pic_url = $2, updated_at = NOW() where id = $3
 returning username;
-
--- name: UpdateProfilePic :one
-update users set profile_pic_url = $1, updated_at = NOW() where id = $2
-returning profile_pic_url;
 
 -- name: UpdateEmail :exec
 update users set email = $1, updated_at = NOW() where id = $2;
@@ -37,3 +33,6 @@ select
     users.created_at, 
     users.updated_at,
     roles.role_name from users join roles on users.role_id = roles.id where users.id = $1;
+
+-- name: GetUserRole :one
+select roles.role_name from users join roles on users.id = roles.id where users.id = $1;
