@@ -63,6 +63,14 @@ type Comment struct {
 	UpdatedAt   time.Time
 }
 
+type RefreshToken struct {
+	Token     string
+	UserID    uuid.UUID
+	ExpiresAt time.Time
+	CreatedAt time.Time
+	UpdateAt  time.Time
+}
+
 type Role struct {
 	ID        uuid.UUID
 	RoleName  string

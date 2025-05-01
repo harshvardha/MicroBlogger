@@ -97,6 +97,17 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 	return i, err
 }
 
+const getUserRole = `-- name: GetUserRole :one
+select roles.role_name from users join roles on users.id = roles.id where users.id = $1
+`
+
+func (q *Queries) GetUserRole(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRowContext(ctx, getUserRole, id)
+	var role_name string
+	err := row.Scan(&role_name)
+	return role_name, err
+}
+
 const removeUser = `-- name: RemoveUser :exec
 delete from users where id = $1
 `
@@ -134,35 +145,19 @@ func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) 
 	return err
 }
 
-const updateProfilePic = `-- name: UpdateProfilePic :one
-update users set profile_pic_url = $1, updated_at = NOW() where id = $2
-returning profile_pic_url
-`
-
-type UpdateProfilePicParams struct {
-	ProfilePicUrl string
-	ID            uuid.UUID
-}
-
-func (q *Queries) UpdateProfilePic(ctx context.Context, arg UpdateProfilePicParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, updateProfilePic, arg.ProfilePicUrl, arg.ID)
-	var profile_pic_url string
-	err := row.Scan(&profile_pic_url)
-	return profile_pic_url, err
-}
-
 const updateUsername = `-- name: UpdateUsername :one
-update users set username = $1, updated_at = NOW() where id = $2
+update users set username = $1, profile_pic_url = $2, updated_at = NOW() where id = $3
 returning username
 `
 
 type UpdateUsernameParams struct {
-	Username string
-	ID       uuid.UUID
+	Username      string
+	ProfilePicUrl string
+	ID            uuid.UUID
 }
 
 func (q *Queries) UpdateUsername(ctx context.Context, arg UpdateUsernameParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, updateUsername, arg.Username, arg.ID)
+	row := q.db.QueryRowContext(ctx, updateUsername, arg.Username, arg.ProfilePicUrl, arg.ID)
 	var username string
 	err := row.Scan(&username)
 	return username, err
