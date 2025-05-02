@@ -30,7 +30,7 @@ type otpCacheData struct {
 }
 
 // otp cache struct
-type otpCache struct {
+type OtpCache struct {
 	cache              map[string]otpCacheData
 	lock               sync.Mutex
 	expiresAfter       time.Duration
@@ -38,8 +38,8 @@ type otpCache struct {
 	emailConfig        *emailConfig
 }
 
-func NewOTPCache(fromEmail string, smtpHost string, smtpPort string, appPassword string) *otpCache {
-	return &otpCache{
+func NewOTPCache(fromEmail string, smtpHost string, smtpPort string, appPassword string) *OtpCache {
+	return &OtpCache{
 		cache:              make(map[string]otpCacheData),
 		expiresAfter:       1 * time.Minute,
 		resendAllowedAfter: 2 * time.Minute,
@@ -53,7 +53,7 @@ func NewOTPCache(fromEmail string, smtpHost string, smtpPort string, appPassword
 	}
 }
 
-func (otpCache *otpCache) set(verificationToken string, otp string, email string, password string) (bool, error) {
+func (otpCache *OtpCache) set(verificationToken string, otp string, email string, password string) (bool, error) {
 	otpCache.lock.Lock()
 	defer otpCache.lock.Unlock()
 
@@ -71,7 +71,7 @@ func (otpCache *otpCache) set(verificationToken string, otp string, email string
 	return true, nil
 }
 
-func (otpCache *otpCache) get(verificationToken string) (otpCacheData, error) {
+func (otpCache *OtpCache) get(verificationToken string) (otpCacheData, error) {
 	otpCache.lock.Lock()
 	defer otpCache.lock.Unlock()
 
@@ -88,7 +88,7 @@ func (otpCache *otpCache) get(verificationToken string) (otpCacheData, error) {
 	return data, nil
 }
 
-func (otpCache *otpCache) delete(verificationToken string) (bool, error) {
+func (otpCache *OtpCache) delete(verificationToken string) (bool, error) {
 	otpCache.lock.Lock()
 	defer otpCache.lock.Unlock()
 
@@ -148,21 +148,22 @@ func sendMail(emailConfig *emailConfig, otp string, to []string) error {
 	return nil
 }
 
-func SendOTP(to string, emailConfig *emailConfig) (bool, string, string, error) {
+func (otpCache *OtpCache) SendOTP(to string, password string) (bool, error) {
 	verificationToken, otp, err := generateOTPAndVerificationToken()
 	if err != nil {
-		return false, "", "", err
+		return false, err
 	}
 
-	err = sendMail(emailConfig, otp, []string{to})
+	err = sendMail(otpCache.emailConfig, otp, []string{to})
 	if err != nil {
-		return false, "", "", err
+		return false, err
 	}
+	otpCache.set(verificationToken, otp, to, password)
 
-	return true, verificationToken, otp, nil
+	return true, nil
 }
 
-func VerifyOTP(verificationToken string, otp string, otpCache *otpCache) (bool, otpCacheData, error) {
+func (otpCache *OtpCache) VerifyOTP(verificationToken string, otp string) (bool, otpCacheData, error) {
 	// checking if the verification token is empty
 	if len(verificationToken) == 0 {
 		return false, otpCacheData{}, errors.New("invalid verification token: empty")
@@ -189,33 +190,34 @@ func VerifyOTP(verificationToken string, otp string, otpCache *otpCache) (bool, 
 	return true, data, nil
 }
 
-func ResendOTP(verificationToken string, otpCache *otpCache) (bool, string, string, error) {
+func (otpCache *OtpCache) ResendOTP(verificationToken string) (bool, error) {
 	// checking if verification token is empty or not
 	if len(verificationToken) == 0 {
-		return false, "", "", errors.New("invalid verification token: empty")
+		return false, errors.New("invalid verification token: empty")
 	}
 
 	// checking if the data exist
 	data, err := otpCache.get(verificationToken)
 	if err != nil {
-		return false, "", "", err
+		return false, err
 	}
 
 	// checking if resend is allowed or not
 	if time.Now().Before(data.issuedAt.Add(otpCache.resendAllowedAfter)) {
-		return false, "", "", errors.New(fmt.Sprintf("resend allowed after %f", otpCache.resendAllowedAfter.Seconds()-float64(time.Now().Sub(data.issuedAt))))
+		return false, errors.New(fmt.Sprintf("resend allowed after %f", otpCache.resendAllowedAfter.Seconds()-float64(time.Now().Sub(data.issuedAt))))
 	}
 	otpCache.delete(verificationToken)
 
 	verificationToken, otp, err := generateOTPAndVerificationToken()
 	if err != nil {
-		return false, "", "", err
+		return false, err
 	}
 
 	err = sendMail(otpCache.emailConfig, otp, []string{data.email})
 	if err != nil {
-		return false, "", "", err
+		return false, err
 	}
+	otpCache.set(verificationToken, otp, data.email, data.password)
 
-	return true, verificationToken, otp, nil
+	return true, nil
 }
