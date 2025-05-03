@@ -10,7 +10,6 @@ import (
 	"github.com/harshvardha/artOfSoftwareEngineering/controllers"
 	"github.com/harshvardha/artOfSoftwareEngineering/internal/cache"
 	"github.com/harshvardha/artOfSoftwareEngineering/internal/database"
-	"github.com/harshvardha/artOfSoftwareEngineering/middlewares"
 	"github.com/harshvardha/artOfSoftwareEngineering/utility"
 	"github.com/joho/godotenv"
 )
@@ -61,20 +60,19 @@ func main() {
 		log.Fatal("Error Connecting to Database: ", err)
 	}
 
-	// setting apiConfig
-	apiConfig := controllers.ApiConfig{
-		DB:        database.New(dbConnection),
-		JwtSecret: jwtSecret,
-		OtpCache:  cache.NewOTPCache(fromEmail, smtpHost, smtpPort, appPassword),
-	}
-
 	// setting data validator
-	dataValidator := middlewares.Validator{
-		Validate: validator.New(),
-	}
+	dataValidator := validator.New()
 
 	// registering new custom password validator
-	dataValidator.Validate.RegisterValidation("password", utility.CustomPasswordValidator)
+	dataValidator.RegisterValidation("password", utility.CustomPasswordValidator)
+
+	// setting apiConfig
+	apiConfig := controllers.ApiConfig{
+		DB:            database.New(dbConnection),
+		JwtSecret:     jwtSecret,
+		OtpCache:      cache.NewOTPCache(fromEmail, smtpHost, smtpPort, appPassword),
+		DataValidator: dataValidator,
+	}
 
 	// creating new request redirecting multiplexer
 	mux := http.NewServeMux()
@@ -87,10 +85,10 @@ func main() {
 	})
 
 	// api endpoints for authentication
-	mux.HandleFunc("POST /api/auth/sendOTP", middlewares.AuthValidation(apiConfig.HandleSendOTP, &dataValidator))
+	mux.HandleFunc("GET /api/auth/sendOTP", apiConfig.HandleSendOTP)
 	mux.HandleFunc("POST /api/auth/verifyOTP", apiConfig.HandleRegisterUser)
 	mux.HandleFunc("GET /api/auth/resendOTP", apiConfig.HandleResendOTP)
-	mux.HandleFunc("POST /api/auth/login", middlewares.AuthValidation(apiConfig.HandleLogin, &dataValidator))
+	mux.HandleFunc("POST /api/auth/login", apiConfig.HandleLogin)
 
 	// starting the server
 	server := &http.Server{
