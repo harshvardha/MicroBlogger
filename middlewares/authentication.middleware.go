@@ -12,9 +12,9 @@ import (
 	"github.com/harshvardha/artOfSoftwareEngineering/utility"
 )
 
-type authHandler func(http.ResponseWriter, *http.Request, *controllers.IDAndRole, *string)
+type AuthenticatedRequestHandler func(http.ResponseWriter, *http.Request, *controllers.IDAndRole, *string)
 
-func ValidateJWT(handler authHandler, tokenSecret string, db *database.Queries, dataValidator *Validator) http.HandlerFunc {
+func ValidateJWT(handler AuthenticatedRequestHandler, tokenSecret string, db *database.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// extracting JWT token from request header
 		authHeader := strings.Split(r.Header.Get("Authorization"), " ")
@@ -52,7 +52,6 @@ func ValidateJWT(handler authHandler, tokenSecret string, db *database.Queries, 
 			ID:   userID,
 			Role: userRole,
 		}
-		urlRequested := r.URL.Path
 
 		if parseError != nil {
 			// checking if the access token is expired or not
@@ -86,20 +85,12 @@ func ValidateJWT(handler authHandler, tokenSecret string, db *database.Queries, 
 						return
 					}
 
-					if urlRequested == "/api/user/updateEmail" || urlRequested == "/api/user/updatePassword" {
-						OtherHandler(validationOtherHandler(handler), dataValidator, &UserRoleAndId, &newAccessToken)
-					}
-
 					handler(w, r, &UserRoleAndId, &newAccessToken)
 				}
 			}
 
 			utility.RespondWithError(w, http.StatusUnauthorized, parseError.Error())
 			return
-		}
-
-		if urlRequested == "/api/user/updateEmail" || urlRequested == "/api/user/updatePassword" {
-			OtherHandler(validationOtherHandler(handler), dataValidator, &UserRoleAndId, nil)
 		}
 
 		handler(w, r, &UserRoleAndId, nil)
