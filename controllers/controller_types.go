@@ -19,12 +19,27 @@ type IDAndRole struct {
 	Role string    `json:"role"`
 }
 
-type RegistrationOrLoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+type registrationRequest struct {
+	Email             string `json:"email"`
+	Username          string `json:"username"`
+	Password          string `json:"password"`
+	ProfilePicUrl     string `json:"profile_pic_url"`
+	VerificationToken string `json:"verification_token"`
+	OTP               string `json:"otp"`
 }
 
 type VerifyOTPRequest struct {
 	VerificationToken string `json:"verification_token"`
 	OTP               string `json:"otp"`
+}
+
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type loginResponse struct {
+	Username      string `json:"username"`
+	ProfilePicUrl string `json:"profile_pic_url"`
+	AccessToken   string `json:"access_token"`
 }
