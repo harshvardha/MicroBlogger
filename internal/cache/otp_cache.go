@@ -145,49 +145,65 @@ func sendMail(emailConfig *emailConfig, otp string, to []string) error {
 	return nil
 }
 
-func (otpCache *OtpCache) SendOTP(to string) (bool, error) {
+func (otpCache *OtpCache) SendOTP(to string) error {
 	verificationToken, otp, err := generateOTPAndVerificationToken()
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	err = sendMail(otpCache.emailConfig, otp, []string{to})
 	if err != nil {
-		return false, err
+		return err
 	}
 	otpCache.set(verificationToken, otp)
 
-	return true, nil
+	return nil
 }
 
-func (otpCache *OtpCache) VerifyOTP(verificationToken string, otp string) (bool, otpCacheData, error) {
+func (otpCache *OtpCache) VerifyOTP(verificationToken string, otp string) error {
 	// checking if the verification token is empty
 	if len(verificationToken) == 0 {
-		return false, otpCacheData{}, errors.New("invalid verification token: empty")
+		return errors.New("invalid verification token: empty")
 	}
 
 	// checking if the data exist
 	data, err := otpCache.get(verificationToken)
 	if err != nil {
-		return false, data, err
+		return err
 	}
 
 	// checking if the otp is expired or not
 	if time.Now().After(data.issuedAt.Add(otpCache.expiresAfter)) {
 		otpCache.delete(verificationToken)
-		return false, otpCacheData{}, errors.New("otp expired")
+		return errors.New("otp expired")
 	}
 
 	// checking if the otp is correct or not
 	if data.otp != otp {
-		return false, otpCacheData{}, errors.New("incorrect otp")
+		return errors.New("incorrect otp")
 	}
 	otpCache.delete(verificationToken)
 
-	return true, data, nil
+	return nil
 }
 
-func (otpCache *OtpCache) ResendOTP(verificationToken string, email string) (bool, error) {
+func (otpCache *OtpCache) ResendOTP(verificationToken string, email string) error {
+	otpCache.delete(verificationToken)
+	verificationToken, otp, err := generateOTPAndVerificationToken()
+	if err != nil {
+		return err
+	}
+
+	err = sendMail(otpCache.emailConfig, otp, []string{email})
+	if err != nil {
+		return err
+	}
+	otpCache.set(verificationToken, otp)
+
+	return nil
+}
+
+func (otpCache *OtpCache) IsResendAllowed(verificationToken string) (bool, error) {
 	// checking if verification token is empty or not
 	if len(verificationToken) == 0 {
 		return false, errors.New("invalid verification token: empty")
@@ -203,18 +219,6 @@ func (otpCache *OtpCache) ResendOTP(verificationToken string, email string) (boo
 	if time.Now().Before(data.issuedAt.Add(otpCache.resendAllowedAfter)) {
 		return false, errors.New(fmt.Sprintf("resend allowed after %f", otpCache.resendAllowedAfter.Seconds()-float64(time.Now().Sub(data.issuedAt))))
 	}
-	otpCache.delete(verificationToken)
-
-	verificationToken, otp, err := generateOTPAndVerificationToken()
-	if err != nil {
-		return false, err
-	}
-
-	err = sendMail(otpCache.emailConfig, otp, []string{email})
-	if err != nil {
-		return false, err
-	}
-	otpCache.set(verificationToken, otp)
 
 	return true, nil
 }
