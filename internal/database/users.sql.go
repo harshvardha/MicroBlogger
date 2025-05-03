@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createUser = `-- name: CreateUser :one
+const createUser = `-- name: CreateUser :exec
 insert into users(id, email, username, profile_pic_url, password, role_id, created_at, updated_at)
 values(
     gen_random_uuid(),
@@ -24,7 +24,6 @@ values(
     NOW(),
     NOW()
 )
-returning id, username, profile_pic_url, role_id, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -35,31 +34,38 @@ type CreateUserParams struct {
 	RoleID        uuid.UUID
 }
 
-type CreateUserRow struct {
-	ID            uuid.UUID
-	Username      string
-	ProfilePicUrl string
-	RoleID        uuid.UUID
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
-	row := q.db.QueryRowContext(ctx, createUser,
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
+	_, err := q.db.ExecContext(ctx, createUser,
 		arg.Email,
 		arg.Username,
 		arg.ProfilePicUrl,
 		arg.Password,
 		arg.RoleID,
 	)
-	var i CreateUserRow
+	return err
+}
+
+const getUserByEmailID = `-- name: GetUserByEmailID :one
+select id, username, profile_pic_url, password, role_id from users where email = $1
+`
+
+type GetUserByEmailIDRow struct {
+	ID            uuid.UUID
+	Username      string
+	ProfilePicUrl string
+	Password      string
+	RoleID        uuid.UUID
+}
+
+func (q *Queries) GetUserByEmailID(ctx context.Context, email string) (GetUserByEmailIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmailID, email)
+	var i GetUserByEmailIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
 		&i.ProfilePicUrl,
+		&i.Password,
 		&i.RoleID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -161,4 +167,15 @@ func (q *Queries) UpdateUsername(ctx context.Context, arg UpdateUsernameParams) 
 	var username string
 	err := row.Scan(&username)
 	return username, err
+}
+
+const userExist = `-- name: UserExist :one
+select exists(select 1 from users where email = $1)
+`
+
+func (q *Queries) UserExist(ctx context.Context, email string) (bool, error) {
+	row := q.db.QueryRowContext(ctx, userExist, email)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }

@@ -1,4 +1,4 @@
--- name: CreateUser :one
+-- name: CreateUser :exec
 insert into users(id, email, username, profile_pic_url, password, role_id, created_at, updated_at)
 values(
     gen_random_uuid(),
@@ -9,8 +9,7 @@ values(
     $5,
     NOW(),
     NOW()
-)
-returning id, username, profile_pic_url, role_id, created_at, updated_at;
+);
 
 -- name: UpdateUsername :one
 update users set username = $1, profile_pic_url = $2, updated_at = NOW() where id = $3
@@ -36,3 +35,9 @@ select
 
 -- name: GetUserRole :one
 select roles.role_name from users join roles on users.id = roles.id where users.id = $1;
+
+-- name: UserExist :one
+select exists(select 1 from users where email = $1);
+
+-- name: GetUserByEmailID :one
+select id, username, profile_pic_url, password, role_id from users where email = $1;
