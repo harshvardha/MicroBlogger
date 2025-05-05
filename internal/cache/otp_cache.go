@@ -36,7 +36,7 @@ type OtpCache struct {
 	emailConfig        *emailConfig
 }
 
-func NewOTPCache(fromEmail string, smtpHost string, smtpPort string, appPassword string) *OtpCache {
+func NewOTPCache(fromEmail string, subject string, body string, smtpHost string, smtpPort string, appPassword string) *OtpCache {
 	return &OtpCache{
 		cache:              make(map[string]otpCacheData),
 		expiresAfter:       1 * time.Minute,

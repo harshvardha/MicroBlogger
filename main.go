@@ -41,6 +41,14 @@ func main() {
 	if fromEmail == "" {
 		log.Fatal("From Email not set")
 	}
+	emailSubject := os.Getenv("EMAIL_SUBJECT")
+	if emailSubject == "" {
+		log.Fatal("Email Subject not set")
+	}
+	emailBody := os.Getenv("EMAIL_BODY")
+	if emailBody == "" {
+		log.Fatal("Email Body not set")
+	}
 	smtpHost := os.Getenv("SMTP_HOST")
 	if smtpHost == "" {
 		log.Fatal("SMTP HOST not set")
@@ -70,7 +78,7 @@ func main() {
 	apiConfig := controllers.ApiConfig{
 		DB:            database.New(dbConnection),
 		JwtSecret:     jwtSecret,
-		OtpCache:      cache.NewOTPCache(fromEmail, smtpHost, smtpPort, appPassword),
+		OtpCache:      cache.NewOTPCache(fromEmail, emailSubject, emailBody, smtpHost, smtpPort, appPassword),
 		DataValidator: dataValidator,
 	}
 
@@ -85,10 +93,10 @@ func main() {
 	})
 
 	// api endpoints for authentication
-	mux.HandleFunc("GET /api/auth/sendOTP", apiConfig.HandleSendOTP)
-	mux.HandleFunc("POST /api/auth/verifyOTP", apiConfig.HandleRegisterUser)
-	mux.HandleFunc("GET /api/auth/resendOTP", apiConfig.HandleResendOTP)
-	mux.HandleFunc("POST /api/auth/login", apiConfig.HandleLogin)
+	mux.HandleFunc("GET /api/v1/auth/otp/send", apiConfig.HandleSendOTP)
+	mux.HandleFunc("POST /api/v1/auth/register", apiConfig.HandleRegisterUser)
+	mux.HandleFunc("GET /api/v1/auth/otp/resend", apiConfig.HandleResendOTP)
+	mux.HandleFunc("POST /api/v1/auth/login", apiConfig.HandleLogin)
 
 	// starting the server
 	server := &http.Server{
