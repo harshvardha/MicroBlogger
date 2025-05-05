@@ -217,7 +217,7 @@ func (otpCache *OtpCache) IsResendAllowed(verificationToken string) (bool, error
 
 	// checking if resend is allowed or not
 	if time.Now().Before(data.issuedAt.Add(otpCache.resendAllowedAfter)) {
-		return false, errors.New(fmt.Sprintf("resend allowed after %f", otpCache.resendAllowedAfter.Seconds()-float64(time.Now().Sub(data.issuedAt))))
+		return false, errors.New(fmt.Sprintf("resend allowed after %f", otpCache.resendAllowedAfter.Seconds()-float64(time.Since(data.issuedAt))))
 	}
 
 	return true, nil
