@@ -39,11 +39,12 @@ type OtpCache struct {
 func NewOTPCache(fromEmail string, subject string, body string, smtpHost string, smtpPort string, appPassword string) *OtpCache {
 	return &OtpCache{
 		cache:              make(map[string]otpCacheData),
-		expiresAfter:       1 * time.Minute,
-		resendAllowedAfter: 2 * time.Minute,
+		expiresAfter:       2 * time.Minute,
+		resendAllowedAfter: 4 * time.Minute,
 		emailConfig: &emailConfig{
 			fromEmail:   fromEmail,
 			subject:     "Registration OTP",
+			body:        body,
 			smtpHost:    smtpHost,
 			smtpPort:    smtpPort,
 			appPassword: appPassword,
@@ -141,23 +142,24 @@ func sendMail(emailConfig *emailConfig, otp string, to []string) error {
 		log.Println("Error Sending OTP: ", err)
 		return err
 	}
+	emailConfig.body = ""
 
 	return nil
 }
 
-func (otpCache *OtpCache) SendOTP(to string) error {
+func (otpCache *OtpCache) SendOTP(to string) (string, error) {
 	verificationToken, otp, err := generateOTPAndVerificationToken()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = sendMail(otpCache.emailConfig, otp, []string{to})
 	if err != nil {
-		return err
+		return "", err
 	}
 	otpCache.set(verificationToken, otp)
 
-	return nil
+	return verificationToken, nil
 }
 
 func (otpCache *OtpCache) VerifyOTP(verificationToken string, otp string) error {
@@ -217,7 +219,7 @@ func (otpCache *OtpCache) IsResendAllowed(verificationToken string) (bool, error
 
 	// checking if resend is allowed or not
 	if time.Now().Before(data.issuedAt.Add(otpCache.resendAllowedAfter)) {
-		return false, errors.New(fmt.Sprintf("resend allowed after %f", otpCache.resendAllowedAfter.Seconds()-float64(time.Since(data.issuedAt))))
+		return false, fmt.Errorf("resend allowed after %f", otpCache.resendAllowedAfter.Seconds()-float64(time.Since(data.issuedAt)))
 	}
 
 	return true, nil
