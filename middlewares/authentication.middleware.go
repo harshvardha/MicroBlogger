@@ -12,9 +12,7 @@ import (
 	"github.com/harshvardha/artOfSoftwareEngineering/utility"
 )
 
-type AuthenticatedRequestHandler func(http.ResponseWriter, *http.Request, *controllers.IDAndRole, *string)
-
-func ValidateJWT(handler AuthenticatedRequestHandler, tokenSecret string, db *database.Queries) http.HandlerFunc {
+func ValidateJWT(handler authenticatedRequestHandler, tokenSecret string, db *database.Queries, routes *Routes) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// extracting JWT token from request header
 		authHeader := strings.Split(r.Header.Get("Authorization"), " ")
@@ -85,7 +83,8 @@ func ValidateJWT(handler AuthenticatedRequestHandler, tokenSecret string, db *da
 						return
 					}
 
-					handler(w, r, &UserRoleAndId, &newAccessToken)
+					// calling the authorization middleware to check whether the user is authorized to access this endpoint
+					routes.userAuthorization(w, r, handler, &UserRoleAndId, db, &newAccessToken)
 				}
 			}
 
@@ -93,6 +92,7 @@ func ValidateJWT(handler AuthenticatedRequestHandler, tokenSecret string, db *da
 			return
 		}
 
-		handler(w, r, &UserRoleAndId, nil)
+		// calling the authorization middleware to check whether the user is authorized to access this endpoint
+		routes.userAuthorization(w, r, handler, &UserRoleAndId, db, nil)
 	}
 }
