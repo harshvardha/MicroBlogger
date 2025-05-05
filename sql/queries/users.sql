@@ -34,7 +34,7 @@ select
     roles.role_name from users join roles on users.role_id = roles.id where users.id = $1;
 
 -- name: GetUserRole :one
-select roles.role_name from users join roles on users.id = roles.id where users.id = $1;
+select role_id from users where users.id = $1;
 
 -- name: UserExist :one
 select exists(select 1 from users where email = $1);

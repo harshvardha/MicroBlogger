@@ -6,11 +6,11 @@ values(
     NOW(),
     NOW()
 )
-returning *;
+returning category, created_at, updated_at;
 
 -- name: UpdateCategory :one
 update categories set category = $1, updated_at = NOW() where id = $2
-returning category, updated_at;
+returning category, created_at, updated_at;
 
 -- name: RemoveCategory :exec
 delete from categories where id = $1;
