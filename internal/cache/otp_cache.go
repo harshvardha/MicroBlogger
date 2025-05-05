@@ -129,7 +129,7 @@ func generateOTPAndVerificationToken() (string, string, error) {
 
 func sendMail(emailConfig *emailConfig, otp string, to []string) error {
 	// constructing the email message
-	emailConfig.body = "one time verification code: " + otp
+	emailConfig.body += otp
 	message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s", emailConfig.fromEmail, to[0], emailConfig.subject, emailConfig.body)
 
 	// authentication
