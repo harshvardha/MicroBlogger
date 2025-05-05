@@ -104,14 +104,14 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 }
 
 const getUserRole = `-- name: GetUserRole :one
-select roles.role_name from users join roles on users.id = roles.id where users.id = $1
+select role_id from users where users.id = $1
 `
 
-func (q *Queries) GetUserRole(ctx context.Context, id uuid.UUID) (string, error) {
+func (q *Queries) GetUserRole(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRowContext(ctx, getUserRole, id)
-	var role_name string
-	err := row.Scan(&role_name)
-	return role_name, err
+	var role_id uuid.UUID
+	err := row.Scan(&role_id)
+	return role_id, err
 }
 
 const removeUser = `-- name: RemoveUser :exec

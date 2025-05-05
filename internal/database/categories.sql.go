@@ -20,18 +20,19 @@ values(
     NOW(),
     NOW()
 )
-returning id, category, created_at, updated_at
+returning category, created_at, updated_at
 `
 
-func (q *Queries) CreateCategory(ctx context.Context, category string) (Category, error) {
+type CreateCategoryRow struct {
+	Category  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) CreateCategory(ctx context.Context, category string) (CreateCategoryRow, error) {
 	row := q.db.QueryRowContext(ctx, createCategory, category)
-	var i Category
-	err := row.Scan(
-		&i.ID,
-		&i.Category,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
+	var i CreateCategoryRow
+	err := row.Scan(&i.Category, &i.CreatedAt, &i.UpdatedAt)
 	return i, err
 }
 
@@ -78,7 +79,7 @@ func (q *Queries) RemoveCategory(ctx context.Context, id uuid.UUID) error {
 
 const updateCategory = `-- name: UpdateCategory :one
 update categories set category = $1, updated_at = NOW() where id = $2
-returning category, updated_at
+returning category, created_at, updated_at
 `
 
 type UpdateCategoryParams struct {
@@ -88,12 +89,13 @@ type UpdateCategoryParams struct {
 
 type UpdateCategoryRow struct {
 	Category  string
+	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
 func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (UpdateCategoryRow, error) {
 	row := q.db.QueryRowContext(ctx, updateCategory, arg.Category, arg.ID)
 	var i UpdateCategoryRow
-	err := row.Scan(&i.Category, &i.UpdatedAt)
+	err := row.Scan(&i.Category, &i.CreatedAt, &i.UpdatedAt)
 	return i, err
 }

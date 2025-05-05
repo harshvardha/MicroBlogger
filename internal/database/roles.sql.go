@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -34,20 +35,48 @@ func (q *Queries) CreateRole(ctx context.Context, roleName string) (Role, error)
 	return i, err
 }
 
-const getRoleById = `-- name: GetRoleById :one
-select id, role_name, created_at, updated_at from roles where id = $1
+const getAllRoles = `-- name: GetAllRoles :many
+select role_name, created_at, updated_at from roles
 `
 
-func (q *Queries) GetRoleById(ctx context.Context, id uuid.UUID) (Role, error) {
+type GetAllRolesRow struct {
+	RoleName  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) GetAllRoles(ctx context.Context) ([]GetAllRolesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllRoles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllRolesRow
+	for rows.Next() {
+		var i GetAllRolesRow
+		if err := rows.Scan(&i.RoleName, &i.CreatedAt, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRoleById = `-- name: GetRoleById :one
+select role_name from roles where id = $1
+`
+
+func (q *Queries) GetRoleById(ctx context.Context, id uuid.UUID) (string, error) {
 	row := q.db.QueryRowContext(ctx, getRoleById, id)
-	var i Role
-	err := row.Scan(
-		&i.ID,
-		&i.RoleName,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+	var role_name string
+	err := row.Scan(&role_name)
+	return role_name, err
 }
 
 const getRoleIdByName = `-- name: GetRoleIdByName :one
@@ -72,7 +101,7 @@ func (q *Queries) RemoveRole(ctx context.Context, id uuid.UUID) error {
 
 const updateRoleById = `-- name: UpdateRoleById :one
 update roles set role_name = $1, updated_at = NOW() where id = $2
-returning role_name
+returning role_name, created_at, updated_at
 `
 
 type UpdateRoleByIdParams struct {
@@ -80,9 +109,15 @@ type UpdateRoleByIdParams struct {
 	ID       uuid.UUID
 }
 
-func (q *Queries) UpdateRoleById(ctx context.Context, arg UpdateRoleByIdParams) (string, error) {
+type UpdateRoleByIdRow struct {
+	RoleName  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpdateRoleById(ctx context.Context, arg UpdateRoleByIdParams) (UpdateRoleByIdRow, error) {
 	row := q.db.QueryRowContext(ctx, updateRoleById, arg.RoleName, arg.ID)
-	var role_name string
-	err := row.Scan(&role_name)
-	return role_name, err
+	var i UpdateRoleByIdRow
+	err := row.Scan(&i.RoleName, &i.CreatedAt, &i.UpdatedAt)
+	return i, err
 }
