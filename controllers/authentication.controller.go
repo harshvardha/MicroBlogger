@@ -35,12 +35,17 @@ func (apiConfig *ApiConfig) HandleSendOTP(w http.ResponseWriter, r *http.Request
 	}
 
 	// sending otp
-	if err = apiConfig.OtpCache.SendOTP(params.Email); err != nil {
+	verificationToken, err := apiConfig.OtpCache.SendOTP(params.Email)
+	if err != nil {
 		utility.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	utility.RespondWithJson(w, http.StatusOK, nil)
+	utility.RespondWithJson(w, http.StatusOK, struct {
+		VerificationToken string `json:"verification_token"`
+	}{
+		VerificationToken: verificationToken,
+	})
 }
 
 func (apiConfig *ApiConfig) HandleRegisterUser(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +84,7 @@ func (apiConfig *ApiConfig) HandleRegisterUser(w http.ResponseWriter, r *http.Re
 	}
 
 	// hashing the password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(params.Password), bcrypt.MaxCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(params.Password), bcrypt.DefaultCost)
 	if err != nil {
 		utility.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -177,7 +182,12 @@ func (apiConfig *ApiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// creating access token
-	accessToken, err := MakeJWT(struct{ UserId string }{UserId: user.ID.String()}, apiConfig.JwtSecret, 2*time.Hour)
+	accessToken, err := MakeJWT(struct {
+		UserId string
+		Role   string
+	}{
+		UserId: user.ID.String(),
+		Role:   user.RoleName}, apiConfig.JwtSecret, 2*time.Hour)
 	if err != nil {
 		utility.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -205,7 +215,10 @@ func (apiConfig *ApiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func MakeJWT(tokenClaims struct{ UserId string }, tokenSecret string, expiresIn time.Duration) (string, error) {
+func MakeJWT(tokenClaims struct {
+	UserId string
+	Role   string
+}, tokenSecret string, expiresIn time.Duration) (string, error) {
 	// creating the signing key to be used for signing the token
 	signingKey := []byte(tokenSecret)
 
@@ -214,11 +227,11 @@ func MakeJWT(tokenClaims struct{ UserId string }, tokenSecret string, expiresIn 
 		Issuer:    "http://localhost:8080",
 		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
-		Subject:   tokenClaims.UserId,
+		Subject:   `user_id:` + tokenClaims.UserId + `,role:` + tokenClaims.Role,
 	}
 
 	// signing the access token with the signing key
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodES512, claims)
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	signedAccessToken, err := accessToken.SignedString(signingKey)
 	if err != nil {
 		return "", err
