@@ -46,7 +46,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 }
 
 const getUserByEmailID = `-- name: GetUserByEmailID :one
-select id, username, profile_pic_url, password, role_id from users where email = $1
+select users.id, users.username, users.profile_pic_url, users.password, roles.role_name from users join roles on users.role_id = roles.id where users.email = $1
 `
 
 type GetUserByEmailIDRow struct {
@@ -54,7 +54,7 @@ type GetUserByEmailIDRow struct {
 	Username      string
 	ProfilePicUrl string
 	Password      string
-	RoleID        uuid.UUID
+	RoleName      string
 }
 
 func (q *Queries) GetUserByEmailID(ctx context.Context, email string) (GetUserByEmailIDRow, error) {
@@ -65,19 +65,19 @@ func (q *Queries) GetUserByEmailID(ctx context.Context, email string) (GetUserBy
 		&i.Username,
 		&i.ProfilePicUrl,
 		&i.Password,
-		&i.RoleID,
+		&i.RoleName,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
 select 
-    users.email, 
-    users.username, 
-    users.profile_pic_url, 
-    users.created_at, 
-    users.updated_at,
-    roles.role_name from users join roles on users.role_id = roles.id where users.id = $1
+    email, 
+    username, 
+    profile_pic_url, 
+    created_at, 
+    updated_at
+    from users where id = $1
 `
 
 type GetUserByIDRow struct {
@@ -86,7 +86,6 @@ type GetUserByIDRow struct {
 	ProfilePicUrl string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
-	RoleName      string
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
@@ -98,7 +97,6 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 		&i.ProfilePicUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.RoleName,
 	)
 	return i, err
 }
@@ -137,6 +135,29 @@ func (q *Queries) UpdateEmail(ctx context.Context, arg UpdateEmailParams) error 
 	return err
 }
 
+const updateOtherDetails = `-- name: UpdateOtherDetails :one
+update users set username = $1, profile_pic_url = $2, updated_at = NOW() where id = $3
+returning username, profile_pic_url
+`
+
+type UpdateOtherDetailsParams struct {
+	Username      string
+	ProfilePicUrl string
+	ID            uuid.UUID
+}
+
+type UpdateOtherDetailsRow struct {
+	Username      string
+	ProfilePicUrl string
+}
+
+func (q *Queries) UpdateOtherDetails(ctx context.Context, arg UpdateOtherDetailsParams) (UpdateOtherDetailsRow, error) {
+	row := q.db.QueryRowContext(ctx, updateOtherDetails, arg.Username, arg.ProfilePicUrl, arg.ID)
+	var i UpdateOtherDetailsRow
+	err := row.Scan(&i.Username, &i.ProfilePicUrl)
+	return i, err
+}
+
 const updatePassword = `-- name: UpdatePassword :exec
 update users set password = $1, updated_at = NOW() where id = $2
 `
@@ -149,24 +170,6 @@ type UpdatePasswordParams struct {
 func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error {
 	_, err := q.db.ExecContext(ctx, updatePassword, arg.Password, arg.ID)
 	return err
-}
-
-const updateUsername = `-- name: UpdateUsername :one
-update users set username = $1, profile_pic_url = $2, updated_at = NOW() where id = $3
-returning username
-`
-
-type UpdateUsernameParams struct {
-	Username      string
-	ProfilePicUrl string
-	ID            uuid.UUID
-}
-
-func (q *Queries) UpdateUsername(ctx context.Context, arg UpdateUsernameParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, updateUsername, arg.Username, arg.ProfilePicUrl, arg.ID)
-	var username string
-	err := row.Scan(&username)
-	return username, err
 }
 
 const userExist = `-- name: UserExist :one

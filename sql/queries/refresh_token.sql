@@ -12,4 +12,4 @@ values(
 select expires_at from refresh_token where user_id = $1;
 
 -- name: RemoveRefreshToken :exec
-delete from refresh_token where token = $1 and user_id = $2;
+delete from refresh_token where user_id = $1;

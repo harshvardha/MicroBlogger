@@ -11,9 +11,9 @@ values(
     NOW()
 );
 
--- name: UpdateUsername :one
+-- name: UpdateOtherDetails :one
 update users set username = $1, profile_pic_url = $2, updated_at = NOW() where id = $3
-returning username;
+returning username, profile_pic_url;
 
 -- name: UpdateEmail :exec
 update users set email = $1, updated_at = NOW() where id = $2;
@@ -26,12 +26,12 @@ delete from users where id = $1;
 
 -- name: GetUserByID :one
 select 
-    users.email, 
-    users.username, 
-    users.profile_pic_url, 
-    users.created_at, 
-    users.updated_at,
-    roles.role_name from users join roles on users.role_id = roles.id where users.id = $1;
+    email, 
+    username, 
+    profile_pic_url, 
+    created_at, 
+    updated_at
+    from users where id = $1;
 
 -- name: GetUserRole :one
 select role_id from users where users.id = $1;
@@ -40,4 +40,4 @@ select role_id from users where users.id = $1;
 select exists(select 1 from users where email = $1);
 
 -- name: GetUserByEmailID :one
-select id, username, profile_pic_url, password, role_id from users where email = $1;
+select users.id, users.username, users.profile_pic_url, users.password, roles.role_name from users join roles on users.role_id = roles.id where users.email = $1;

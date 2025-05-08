@@ -46,15 +46,10 @@ func (q *Queries) GetRefreshTokenExpirationTime(ctx context.Context, userID uuid
 }
 
 const removeRefreshToken = `-- name: RemoveRefreshToken :exec
-delete from refresh_token where token = $1 and user_id = $2
+delete from refresh_token where user_id = $1
 `
 
-type RemoveRefreshTokenParams struct {
-	Token  string
-	UserID uuid.UUID
-}
-
-func (q *Queries) RemoveRefreshToken(ctx context.Context, arg RemoveRefreshTokenParams) error {
-	_, err := q.db.ExecContext(ctx, removeRefreshToken, arg.Token, arg.UserID)
+func (q *Queries) RemoveRefreshToken(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, removeRefreshToken, userID)
 	return err
 }
