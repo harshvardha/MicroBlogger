@@ -2,11 +2,11 @@
 create table blogs(
     id uuid not null primary key,
     title text not null unique,
-    brief text not null unique,
+    brief varchar(200) not null unique,
     content_url text not null,
-    images json[] not null,
+    images json not null,
     thumbnail_url text not null,
-    code_repo_link text not null,
+    code_repo_link text,
     views int not null default 0,
     likes int not null default 0,
     tags text not null,
@@ -17,4 +17,4 @@ create table blogs(
 );
 
 -- +goose Down
-drop table golang;
+drop table blogs;

@@ -17,3 +17,6 @@ delete from categories where id = $1;
 
 -- name: GetAllCategories :many
 select * from categories;
+
+-- name: GetCategoryIDByName :one
+select id from categories where category = $1;

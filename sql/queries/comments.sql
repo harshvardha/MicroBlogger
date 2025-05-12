@@ -6,7 +6,7 @@ insert into comments(
     gen_random_uuid(),
     $1, $2, $3, NOW(), NOW()
 )
-returning *;
+returning id, description, created_at, updated_at;
 
 -- name: UpdateCommentByID :one
 update comments set description = $1, updated_at = NOW() where id = $2 and user_id = $3
