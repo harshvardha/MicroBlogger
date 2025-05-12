@@ -142,7 +142,7 @@ func sendMail(emailConfig *emailConfig, otp string, to []string) error {
 		log.Println("Error Sending OTP: ", err)
 		return err
 	}
-	emailConfig.body = ""
+	emailConfig.body = "Welcome To Learning TheArtOfSoftwareEngineering.\nYour One Time Verification Code: "
 
 	return nil
 }
