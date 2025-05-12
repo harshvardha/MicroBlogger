@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -12,7 +13,26 @@ import (
 	"github.com/harshvardha/artOfSoftwareEngineering/utility"
 )
 
-func ValidateJWT(handler authenticatedRequestHandler, tokenSecret string, db *database.Queries, routes *Routes) http.HandlerFunc {
+func getSubjects(tokenSubjects string) (map[string]string, error) {
+	subjects := strings.Split(tokenSubjects, ",")
+	if len(subjects) == 0 {
+		return nil, errors.New("no subject found")
+	}
+
+	subjectsMap := make(map[string]string, len(subjects))
+	var temp []string
+	for _, subject := range subjects {
+		temp = strings.Split(subject, ":")
+		if len(temp) == 0 {
+			return nil, errors.New("not all claims found")
+		}
+		subjectsMap[temp[0]] = temp[1]
+	}
+
+	return subjectsMap, nil
+}
+
+func ValidateJWT(handler authenticatedRequestHandler, tokenSecret string, db *database.Queries, routes map[string][]string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// extracting JWT token from request header
 		authHeader := strings.Split(r.Header.Get("Authorization"), " ")
@@ -28,41 +48,33 @@ func ValidateJWT(handler authenticatedRequestHandler, tokenSecret string, db *da
 		})
 
 		// extracting userID from token claims
-		userIDString, err := token.Claims.GetSubject()
+		subjects, err := token.Claims.GetSubject()
 		if err != nil {
 			utility.RespondWithError(w, http.StatusUnauthorized, err.Error())
 			return
 		}
-		userID, err := uuid.Parse(userIDString)
+		parsedSubjects, err := getSubjects(subjects)
+		if err != nil {
+			utility.RespondWithError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+
+		userID, err := uuid.Parse(parsedSubjects["user_id"])
 		if err != nil {
 			utility.RespondWithError(w, http.StatusNotAcceptable, err.Error())
 			return
 		}
-
-		// fetching the role of the user
-		userRole, err := db.GetUserRole(r.Context(), userID)
-		if err != nil {
-			utility.RespondWithError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
 		UserRoleAndId := controllers.IDAndRole{
 			ID:   userID,
-			Role: userRole,
+			Role: parsedSubjects["role"],
 		}
 
 		if parseError != nil {
 			// checking if the access token is expired or not
-			tokenExpiresAt, err := token.Claims.GetExpirationTime()
-			if err != nil {
-				utility.RespondWithError(w, http.StatusUnauthorized, err.Error())
-				return
-			}
-
 			// if access token is expired then we will check if the refresh token is expired or not
 			// if refresh token is not expired then we will create a new access token and continue
 			// if refresh token is expired then we will ask user to login again
-			if time.Now().After(tokenExpiresAt.Time) {
+			if errors.Is(parseError, jwt.ErrTokenExpired) {
 				refreshTokenExpiresAt, err := db.GetRefreshTokenExpirationTime(r.Context(), userID)
 				if err != nil {
 					utility.RespondWithError(w, http.StatusUnauthorized, err.Error())
@@ -77,14 +89,20 @@ func ValidateJWT(handler authenticatedRequestHandler, tokenSecret string, db *da
 					return
 				} else {
 					// creating new access token
-					newAccessToken, err := controllers.MakeJWT(struct{ UserId string }{UserId: userIDString}, tokenSecret, time.Hour)
+					newAccessToken, err := controllers.MakeJWT(struct {
+						UserId string
+						Role   string
+					}{
+						UserId: userID.String(),
+						Role:   parsedSubjects["role"],
+					}, tokenSecret, time.Hour)
 					if err != nil {
 						utility.RespondWithError(w, http.StatusInternalServerError, err.Error())
 						return
 					}
 
 					// calling the authorization middleware to check whether the user is authorized to access this endpoint
-					routes.userAuthorization(w, r, handler, &UserRoleAndId, db, &newAccessToken)
+					userAuthorization(w, r, handler, routes, &UserRoleAndId, newAccessToken)
 				}
 			}
 
@@ -93,6 +111,6 @@ func ValidateJWT(handler authenticatedRequestHandler, tokenSecret string, db *da
 		}
 
 		// calling the authorization middleware to check whether the user is authorized to access this endpoint
-		routes.userAuthorization(w, r, handler, &UserRoleAndId, db, nil)
+		userAuthorization(w, r, handler, routes, &UserRoleAndId, "")
 	}
 }

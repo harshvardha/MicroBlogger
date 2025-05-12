@@ -6,5 +6,4 @@ import (
 	"github.com/harshvardha/artOfSoftwareEngineering/controllers"
 )
 
-// authenticated endpoints handler
-type authenticatedRequestHandler func(http.ResponseWriter, *http.Request, *controllers.IDAndRole, *string)
+type authenticatedRequestHandler func(http.ResponseWriter, *http.Request, *controllers.IDAndRole, string)
