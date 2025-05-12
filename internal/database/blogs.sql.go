@@ -7,11 +7,11 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
 const createBlog = `-- name: CreateBlog :one
@@ -40,9 +40,9 @@ type CreateBlogParams struct {
 	Title        string
 	Brief        string
 	ContentUrl   string
-	Images       []json.RawMessage
+	Images       json.RawMessage
 	ThumbnailUrl string
-	CodeRepoLink string
+	CodeRepoLink sql.NullString
 	Tags         string
 	Author       uuid.UUID
 	Category     uuid.UUID
@@ -53,7 +53,7 @@ func (q *Queries) CreateBlog(ctx context.Context, arg CreateBlogParams) (Blog, e
 		arg.Title,
 		arg.Brief,
 		arg.ContentUrl,
-		pq.Array(arg.Images),
+		arg.Images,
 		arg.ThumbnailUrl,
 		arg.CodeRepoLink,
 		arg.Tags,
@@ -66,7 +66,7 @@ func (q *Queries) CreateBlog(ctx context.Context, arg CreateBlogParams) (Blog, e
 		&i.Title,
 		&i.Brief,
 		&i.ContentUrl,
-		pq.Array(&i.Images),
+		&i.Images,
 		&i.ThumbnailUrl,
 		&i.CodeRepoLink,
 		&i.Views,
@@ -80,10 +80,23 @@ func (q *Queries) CreateBlog(ctx context.Context, arg CreateBlogParams) (Blog, e
 	return i, err
 }
 
+const dislikeBlog = `-- name: DislikeBlog :exec
+delete from likes where user_id = $1 and blog_id = $2
+`
+
+type DislikeBlogParams struct {
+	UserID uuid.UUID
+	BlogID uuid.UUID
+}
+
+func (q *Queries) DislikeBlog(ctx context.Context, arg DislikeBlogParams) error {
+	_, err := q.db.ExecContext(ctx, dislikeBlog, arg.UserID, arg.BlogID)
+	return err
+}
+
 const getAllBlogsByCategory = `-- name: GetAllBlogsByCategory :many
 select 
-id, title, brief,
-thumbnail_url, views, likes,
+id, title, brief, thumbnail_url, views, likes,
 tags, created_at from blogs where category = $1 and id > $2 limit $3
 `
 
@@ -138,7 +151,7 @@ func (q *Queries) GetAllBlogsByCategory(ctx context.Context, arg GetAllBlogsByCa
 
 const getBlogByID = `-- name: GetBlogByID :one
 select
-blogs.title, blogs.content_url, blogs.images,
+blogs.title, blogs.brief, blogs.content_url, blogs.images, blogs.thumbnail_url,
 blogs.code_repo_link, blogs.views, blogs.likes,
 blogs.tags, users.username, blogs.created_at
 from blogs join users on blogs.author = users.id where blogs.id = $1
@@ -146,9 +159,11 @@ from blogs join users on blogs.author = users.id where blogs.id = $1
 
 type GetBlogByIDRow struct {
 	Title        string
+	Brief        string
 	ContentUrl   string
-	Images       []json.RawMessage
-	CodeRepoLink string
+	Images       json.RawMessage
+	ThumbnailUrl string
+	CodeRepoLink sql.NullString
 	Views        int32
 	Likes        int32
 	Tags         string
@@ -161,8 +176,10 @@ func (q *Queries) GetBlogByID(ctx context.Context, id uuid.UUID) (GetBlogByIDRow
 	var i GetBlogByIDRow
 	err := row.Scan(
 		&i.Title,
+		&i.Brief,
 		&i.ContentUrl,
-		pq.Array(&i.Images),
+		&i.Images,
+		&i.ThumbnailUrl,
 		&i.CodeRepoLink,
 		&i.Views,
 		&i.Likes,
@@ -171,6 +188,68 @@ func (q *Queries) GetBlogByID(ctx context.Context, id uuid.UUID) (GetBlogByIDRow
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getNumberOfLikes = `-- name: GetNumberOfLikes :one
+select count(*) as noOfLikes from likes where blog_id = $1
+`
+
+func (q *Queries) GetNumberOfLikes(ctx context.Context, blogID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getNumberOfLikes, blogID)
+	var nooflikes int64
+	err := row.Scan(&nooflikes)
+	return nooflikes, err
+}
+
+const getViewCount = `-- name: GetViewCount :one
+select views from blogs where id = $1
+`
+
+func (q *Queries) GetViewCount(ctx context.Context, id uuid.UUID) (int32, error) {
+	row := q.db.QueryRowContext(ctx, getViewCount, id)
+	var views int32
+	err := row.Scan(&views)
+	return views, err
+}
+
+const hasUserLikedBlog = `-- name: HasUserLikedBlog :one
+select 1 from likes where user_id = $1 and blog_id = $2
+`
+
+type HasUserLikedBlogParams struct {
+	UserID uuid.UUID
+	BlogID uuid.UUID
+}
+
+func (q *Queries) HasUserLikedBlog(ctx context.Context, arg HasUserLikedBlogParams) (int32, error) {
+	row := q.db.QueryRowContext(ctx, hasUserLikedBlog, arg.UserID, arg.BlogID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const incrementViews = `-- name: IncrementViews :exec
+update blogs set views = views + 1 where id = $1
+`
+
+func (q *Queries) IncrementViews(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, incrementViews, id)
+	return err
+}
+
+const likeBlog = `-- name: LikeBlog :exec
+insert into likes(user_id, blog_id, created_at, updated_at)
+values($1, $2, NOW(), NOW())
+`
+
+type LikeBlogParams struct {
+	UserID uuid.UUID
+	BlogID uuid.UUID
+}
+
+func (q *Queries) LikeBlog(ctx context.Context, arg LikeBlogParams) error {
+	_, err := q.db.ExecContext(ctx, likeBlog, arg.UserID, arg.BlogID)
+	return err
 }
 
 const removeBlog = `-- name: RemoveBlog :exec
@@ -182,60 +261,44 @@ func (q *Queries) RemoveBlog(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-const updateBlog = `-- name: UpdateBlog :exec
+const updateBlog = `-- name: UpdateBlog :one
 update blogs set
-title = $1, brief = $2, content_url = $3,
-thumbnail_url = $4, code_repo_link = $5,
-category = $6, updated_at = NOW() where id = $7
+title = $1, brief = $2, content_url = $3, images = $4,
+thumbnail_url = $5, code_repo_link = $6, tags = $7,
+category = $8, updated_at = NOW() where id = $9
+returning created_at, updated_at
 `
 
 type UpdateBlogParams struct {
 	Title        string
 	Brief        string
 	ContentUrl   string
+	Images       json.RawMessage
 	ThumbnailUrl string
-	CodeRepoLink string
+	CodeRepoLink sql.NullString
+	Tags         string
 	Category     uuid.UUID
 	ID           uuid.UUID
 }
 
-func (q *Queries) UpdateBlog(ctx context.Context, arg UpdateBlogParams) error {
-	_, err := q.db.ExecContext(ctx, updateBlog,
+type UpdateBlogRow struct {
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpdateBlog(ctx context.Context, arg UpdateBlogParams) (UpdateBlogRow, error) {
+	row := q.db.QueryRowContext(ctx, updateBlog,
 		arg.Title,
 		arg.Brief,
 		arg.ContentUrl,
+		arg.Images,
 		arg.ThumbnailUrl,
 		arg.CodeRepoLink,
+		arg.Tags,
 		arg.Category,
 		arg.ID,
 	)
-	return err
-}
-
-const updateBlogTags = `-- name: UpdateBlogTags :exec
-update blogs set tags = $1, updated_at = NOW() where id = $2
-`
-
-type UpdateBlogTagsParams struct {
-	Tags string
-	ID   uuid.UUID
-}
-
-func (q *Queries) UpdateBlogTags(ctx context.Context, arg UpdateBlogTagsParams) error {
-	_, err := q.db.ExecContext(ctx, updateBlogTags, arg.Tags, arg.ID)
-	return err
-}
-
-const updateImages = `-- name: UpdateImages :exec
-update blogs set images = $1, updated_at = NOW() where id = $2
-`
-
-type UpdateImagesParams struct {
-	Images []json.RawMessage
-	ID     uuid.UUID
-}
-
-func (q *Queries) UpdateImages(ctx context.Context, arg UpdateImagesParams) error {
-	_, err := q.db.ExecContext(ctx, updateImages, pq.Array(arg.Images), arg.ID)
-	return err
+	var i UpdateBlogRow
+	err := row.Scan(&i.CreatedAt, &i.UpdatedAt)
+	return i, err
 }

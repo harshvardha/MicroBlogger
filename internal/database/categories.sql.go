@@ -68,6 +68,17 @@ func (q *Queries) GetAllCategories(ctx context.Context) ([]Category, error) {
 	return items, nil
 }
 
+const getCategoryIDByName = `-- name: GetCategoryIDByName :one
+select id from categories where category = $1
+`
+
+func (q *Queries) GetCategoryIDByName(ctx context.Context, category string) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, getCategoryIDByName, category)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const removeCategory = `-- name: RemoveCategory :exec
 delete from categories where id = $1
 `

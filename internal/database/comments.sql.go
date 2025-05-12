@@ -20,7 +20,7 @@ insert into comments(
     gen_random_uuid(),
     $1, $2, $3, NOW(), NOW()
 )
-returning id, description, likes, user_id, blog_id, created_at, updated_at
+returning id, description, created_at, updated_at
 `
 
 type CreateCommentParams struct {
@@ -29,15 +29,19 @@ type CreateCommentParams struct {
 	BlogID      uuid.UUID
 }
 
-func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (Comment, error) {
+type CreateCommentRow struct {
+	ID          uuid.UUID
+	Description string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (CreateCommentRow, error) {
 	row := q.db.QueryRowContext(ctx, createComment, arg.Description, arg.UserID, arg.BlogID)
-	var i Comment
+	var i CreateCommentRow
 	err := row.Scan(
 		&i.ID,
 		&i.Description,
-		&i.Likes,
-		&i.UserID,
-		&i.BlogID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

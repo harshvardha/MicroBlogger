@@ -59,28 +59,25 @@ func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (Book, e
 }
 
 const getAllBooks = `-- name: GetAllBooks :many
-select id, name, cover_image_url, review, tags, level, created_at, updated_at from books
+select id, name, cover_image_url from books
 `
 
-func (q *Queries) GetAllBooks(ctx context.Context) ([]Book, error) {
+type GetAllBooksRow struct {
+	ID            uuid.UUID
+	Name          string
+	CoverImageUrl string
+}
+
+func (q *Queries) GetAllBooks(ctx context.Context) ([]GetAllBooksRow, error) {
 	rows, err := q.db.QueryContext(ctx, getAllBooks)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Book
+	var items []GetAllBooksRow
 	for rows.Next() {
-		var i Book
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.CoverImageUrl,
-			&i.Review,
-			&i.Tags,
-			&i.Level,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
+		var i GetAllBooksRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.CoverImageUrl); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -105,18 +102,42 @@ func (q *Queries) GetAllBooksCount(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-const getBooksByLevel = `-- name: GetBooksByLevel :many
-select name, cover_image_url, review, tags from books where level = $1
+const getBookByID = `-- name: GetBookByID :one
+select name, cover_image_url, review, tags, level from books where id = $1
 `
 
-type GetBooksByLevelRow struct {
+type GetBookByIDRow struct {
 	Name          string
 	CoverImageUrl string
 	Review        string
 	Tags          string
+	Level         uuid.UUID
 }
 
-func (q *Queries) GetBooksByLevel(ctx context.Context, level uuid.UUID) ([]GetBooksByLevelRow, error) {
+func (q *Queries) GetBookByID(ctx context.Context, id uuid.UUID) (GetBookByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getBookByID, id)
+	var i GetBookByIDRow
+	err := row.Scan(
+		&i.Name,
+		&i.CoverImageUrl,
+		&i.Review,
+		&i.Tags,
+		&i.Level,
+	)
+	return i, err
+}
+
+const getBooksByLevel = `-- name: GetBooksByLevel :many
+select id, name, cover_image_url from books where books.level = (select id from book_level where book_level.level = $1)
+`
+
+type GetBooksByLevelRow struct {
+	ID            uuid.UUID
+	Name          string
+	CoverImageUrl string
+}
+
+func (q *Queries) GetBooksByLevel(ctx context.Context, level string) ([]GetBooksByLevelRow, error) {
 	rows, err := q.db.QueryContext(ctx, getBooksByLevel, level)
 	if err != nil {
 		return nil, err
@@ -125,12 +146,7 @@ func (q *Queries) GetBooksByLevel(ctx context.Context, level uuid.UUID) ([]GetBo
 	var items []GetBooksByLevelRow
 	for rows.Next() {
 		var i GetBooksByLevelRow
-		if err := rows.Scan(
-			&i.Name,
-			&i.CoverImageUrl,
-			&i.Review,
-			&i.Tags,
-		); err != nil {
+		if err := rows.Scan(&i.ID, &i.Name, &i.CoverImageUrl); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -144,6 +160,33 @@ func (q *Queries) GetBooksByLevel(ctx context.Context, level uuid.UUID) ([]GetBo
 	return items, nil
 }
 
+const getLevelIDByName = `-- name: GetLevelIDByName :one
+select id from book_level where level = $1
+`
+
+func (q *Queries) GetLevelIDByName(ctx context.Context, level string) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, getLevelIDByName, level)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getReviewByBookID = `-- name: GetReviewByBookID :one
+select review, cover_image_url from books where id = $1
+`
+
+type GetReviewByBookIDRow struct {
+	Review        string
+	CoverImageUrl string
+}
+
+func (q *Queries) GetReviewByBookID(ctx context.Context, id uuid.UUID) (GetReviewByBookIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getReviewByBookID, id)
+	var i GetReviewByBookIDRow
+	err := row.Scan(&i.Review, &i.CoverImageUrl)
+	return i, err
+}
+
 const removeBook = `-- name: RemoveBook :exec
 delete from books where id = $1
 `
@@ -153,57 +196,30 @@ func (q *Queries) RemoveBook(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-const updateBook = `-- name: UpdateBook :one
+const updateBook = `-- name: UpdateBook :exec
 update books
 set name = $1, cover_image_url = $2,
-review = $3, level = $4, updated_at = NOW()
-where id = $5
-returning id, name, cover_image_url, review, tags, level, created_at, updated_at
+review = $3, tags = $4, level = $5, updated_at = NOW()
+where id = $6
 `
 
 type UpdateBookParams struct {
 	Name          string
 	CoverImageUrl string
 	Review        string
+	Tags          string
 	Level         uuid.UUID
 	ID            uuid.UUID
 }
 
-func (q *Queries) UpdateBook(ctx context.Context, arg UpdateBookParams) (Book, error) {
-	row := q.db.QueryRowContext(ctx, updateBook,
+func (q *Queries) UpdateBook(ctx context.Context, arg UpdateBookParams) error {
+	_, err := q.db.ExecContext(ctx, updateBook,
 		arg.Name,
 		arg.CoverImageUrl,
 		arg.Review,
+		arg.Tags,
 		arg.Level,
 		arg.ID,
 	)
-	var i Book
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.CoverImageUrl,
-		&i.Review,
-		&i.Tags,
-		&i.Level,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const updateBookTags = `-- name: UpdateBookTags :one
-update books set tags = $1 where id = $2
-returning tags
-`
-
-type UpdateBookTagsParams struct {
-	Tags string
-	ID   uuid.UUID
-}
-
-func (q *Queries) UpdateBookTags(ctx context.Context, arg UpdateBookTagsParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, updateBookTags, arg.Tags, arg.ID)
-	var tags string
-	err := row.Scan(&tags)
-	return tags, err
+	return err
 }

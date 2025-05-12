@@ -5,6 +5,7 @@
 package database
 
 import (
+	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -16,9 +17,9 @@ type Blog struct {
 	Title        string
 	Brief        string
 	ContentUrl   string
-	Images       []json.RawMessage
+	Images       json.RawMessage
 	ThumbnailUrl string
-	CodeRepoLink string
+	CodeRepoLink sql.NullString
 	Views        int32
 	Likes        int32
 	Tags         string
@@ -61,6 +62,13 @@ type Comment struct {
 	BlogID      uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+type Like struct {
+	UserID    uuid.UUID
+	BlogID    uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type RefreshToken struct {
