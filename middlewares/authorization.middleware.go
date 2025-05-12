@@ -31,7 +31,13 @@ func userAuthorization(w http.ResponseWriter, r *http.Request, handler authentic
 
 	if slices.Contains(routes["nil_IDAndRole"], endpoint) {
 		handler(w, r, nil, newAccessToken)
-	} else {
-		handler(w, r, IDAndRole, newAccessToken)
+		return
 	}
+
+	if slices.Contains(routes["nil_accessToken"], endpoint) {
+		handler(w, r, IDAndRole, "")
+		return
+	}
+
+	handler(w, r, IDAndRole, newAccessToken)
 }
