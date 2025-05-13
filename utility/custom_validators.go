@@ -37,10 +37,20 @@ func GithubURLValidator(fl validator.FieldLevel) bool {
 	return isURLValid
 }
 
-func TagsValidator(fl validator.FieldLevel) bool {
-	tags := fl.Field().String()
-	pattern := `^[a-zA-z0-9;]`
-	return regexp.MustCompile(pattern).MatchString(tags)
+func NoDuplicatesTagsValidator(fl validator.FieldLevel) bool {
+	tags, ok := fl.Field().Interface().([]string)
+	if !ok {
+		return false
+	}
+
+	seen := make(map[string]struct{})
+	for _, tag := range tags {
+		if _, exists := seen[tag]; exists {
+			return false
+		}
+		seen[tag] = struct{}{}
+	}
+	return true
 }
 
 func UsernameValidator(fl validator.FieldLevel) bool {
