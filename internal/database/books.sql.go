@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const createBook = `-- name: CreateBook :one
@@ -25,14 +26,14 @@ insert into books(
     NOW(),
     NOW()
 )
-returning id, name, cover_image_url, review, tags, level, created_at, updated_at
+returning id, name, cover_image_url, review, level, created_at, updated_at, tags
 `
 
 type CreateBookParams struct {
 	Name          string
 	CoverImageUrl string
 	Review        string
-	Tags          string
+	Tags          []string
 	Level         uuid.UUID
 }
 
@@ -41,7 +42,7 @@ func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (Book, e
 		arg.Name,
 		arg.CoverImageUrl,
 		arg.Review,
-		arg.Tags,
+		pq.Array(arg.Tags),
 		arg.Level,
 	)
 	var i Book
@@ -50,10 +51,10 @@ func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (Book, e
 		&i.Name,
 		&i.CoverImageUrl,
 		&i.Review,
-		&i.Tags,
 		&i.Level,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		pq.Array(&i.Tags),
 	)
 	return i, err
 }
@@ -110,7 +111,7 @@ type GetBookByIDRow struct {
 	Name          string
 	CoverImageUrl string
 	Review        string
-	Tags          string
+	Tags          []string
 	Level         uuid.UUID
 }
 
@@ -121,7 +122,7 @@ func (q *Queries) GetBookByID(ctx context.Context, id uuid.UUID) (GetBookByIDRow
 		&i.Name,
 		&i.CoverImageUrl,
 		&i.Review,
-		&i.Tags,
+		pq.Array(&i.Tags),
 		&i.Level,
 	)
 	return i, err
@@ -207,7 +208,7 @@ type UpdateBookParams struct {
 	Name          string
 	CoverImageUrl string
 	Review        string
-	Tags          string
+	Tags          []string
 	Level         uuid.UUID
 	ID            uuid.UUID
 }
@@ -217,7 +218,7 @@ func (q *Queries) UpdateBook(ctx context.Context, arg UpdateBookParams) error {
 		arg.Name,
 		arg.CoverImageUrl,
 		arg.Review,
-		arg.Tags,
+		pq.Array(arg.Tags),
 		arg.Level,
 		arg.ID,
 	)

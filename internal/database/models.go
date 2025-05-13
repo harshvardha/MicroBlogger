@@ -22,11 +22,11 @@ type Blog struct {
 	CodeRepoLink sql.NullString
 	Views        int32
 	Likes        int32
-	Tags         string
 	Author       uuid.UUID
 	Category     uuid.UUID
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	Tags         []string
 }
 
 type Book struct {
@@ -34,10 +34,10 @@ type Book struct {
 	Name          string
 	CoverImageUrl string
 	Review        string
-	Tags          string
 	Level         uuid.UUID
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	Tags          []string
 }
 
 type BookLevel struct {

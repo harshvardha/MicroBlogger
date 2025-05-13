@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const createBlog = `-- name: CreateBlog :one
@@ -33,7 +34,7 @@ insert into blogs(
     NOW(),
     NOW()
 )
-returning id, title, brief, content_url, images, thumbnail_url, code_repo_link, views, likes, tags, author, category, created_at, updated_at
+returning id, title, brief, content_url, images, thumbnail_url, code_repo_link, views, likes, author, category, created_at, updated_at, tags
 `
 
 type CreateBlogParams struct {
@@ -43,7 +44,7 @@ type CreateBlogParams struct {
 	Images       json.RawMessage
 	ThumbnailUrl string
 	CodeRepoLink sql.NullString
-	Tags         string
+	Tags         []string
 	Author       uuid.UUID
 	Category     uuid.UUID
 }
@@ -56,7 +57,7 @@ func (q *Queries) CreateBlog(ctx context.Context, arg CreateBlogParams) (Blog, e
 		arg.Images,
 		arg.ThumbnailUrl,
 		arg.CodeRepoLink,
-		arg.Tags,
+		pq.Array(arg.Tags),
 		arg.Author,
 		arg.Category,
 	)
@@ -71,11 +72,11 @@ func (q *Queries) CreateBlog(ctx context.Context, arg CreateBlogParams) (Blog, e
 		&i.CodeRepoLink,
 		&i.Views,
 		&i.Likes,
-		&i.Tags,
 		&i.Author,
 		&i.Category,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		pq.Array(&i.Tags),
 	)
 	return i, err
 }
@@ -113,7 +114,7 @@ type GetAllBlogsByCategoryRow struct {
 	ThumbnailUrl string
 	Views        int32
 	Likes        int32
-	Tags         string
+	Tags         []string
 	CreatedAt    time.Time
 }
 
@@ -133,7 +134,7 @@ func (q *Queries) GetAllBlogsByCategory(ctx context.Context, arg GetAllBlogsByCa
 			&i.ThumbnailUrl,
 			&i.Views,
 			&i.Likes,
-			&i.Tags,
+			pq.Array(&i.Tags),
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -166,7 +167,7 @@ type GetBlogByIDRow struct {
 	CodeRepoLink sql.NullString
 	Views        int32
 	Likes        int32
-	Tags         string
+	Tags         []string
 	Username     string
 	CreatedAt    time.Time
 }
@@ -183,7 +184,7 @@ func (q *Queries) GetBlogByID(ctx context.Context, id uuid.UUID) (GetBlogByIDRow
 		&i.CodeRepoLink,
 		&i.Views,
 		&i.Likes,
-		&i.Tags,
+		pq.Array(&i.Tags),
 		&i.Username,
 		&i.CreatedAt,
 	)
@@ -276,7 +277,7 @@ type UpdateBlogParams struct {
 	Images       json.RawMessage
 	ThumbnailUrl string
 	CodeRepoLink sql.NullString
-	Tags         string
+	Tags         []string
 	Category     uuid.UUID
 	ID           uuid.UUID
 }
@@ -294,7 +295,7 @@ func (q *Queries) UpdateBlog(ctx context.Context, arg UpdateBlogParams) (UpdateB
 		arg.Images,
 		arg.ThumbnailUrl,
 		arg.CodeRepoLink,
-		arg.Tags,
+		pq.Array(arg.Tags),
 		arg.Category,
 		arg.ID,
 	)
