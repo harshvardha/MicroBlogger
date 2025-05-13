@@ -43,3 +43,7 @@ type loginResponse struct {
 	ProfilePicUrl string `json:"profile_pic_url"`
 	AccessToken   string `json:"access_token"`
 }
+
+type EmptyResponse struct {
+	AccessToken string `json:"access_token"`
+}
