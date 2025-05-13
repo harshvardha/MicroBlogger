@@ -12,11 +12,11 @@ import (
 // admin
 func (apiConfig *ApiConfig) HandleAddBook(w http.ResponseWriter, r *http.Request, IDAndRole *IDAndRole, newAccessToken string) {
 	type Request struct {
-		Name          string `json:"name"`
-		CoverImageURL string `json:"coverImageUrl"`
-		Review        string `json:"review"`
-		Tags          string `json:"tags"`
-		Level         string `json:"level"`
+		Name          string   `json:"name"`
+		CoverImageURL string   `json:"coverImageUrl"`
+		Review        string   `json:"review"`
+		Tags          []string `json:"tags"`
+		Level         string   `json:"level"`
 	}
 
 	type Response struct {
@@ -50,7 +50,7 @@ func (apiConfig *ApiConfig) HandleAddBook(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err = apiConfig.DataValidator.Var(params.Tags, "required,tags"); err != nil {
+	if err = apiConfig.DataValidator.Var(params.Tags, "required,min=1,tags,dive,required,alpha"); err != nil {
 		utility.RespondWithError(w, http.StatusNotAcceptable, err.Error())
 		return
 	}
@@ -93,7 +93,7 @@ func (apiConfig *ApiConfig) HandleUpdateBook(w http.ResponseWriter, r *http.Requ
 		Name          string    `json:"name,omitempty"`
 		CoverImageURL string    `json:"coverImageUrl,omitempty"`
 		Review        string    `json:"review,omitempty"`
-		Tags          string    `json:"tags,omitempty"`
+		Tags          []string  `json:"tags,omitempty"`
 		Level         string    `json:"level,omitempty"`
 	}
 
@@ -132,7 +132,7 @@ func (apiConfig *ApiConfig) HandleUpdateBook(w http.ResponseWriter, r *http.Requ
 		updateBook.Review = existingInformation.Review
 	}
 
-	if apiConfig.DataValidator.Var(params.Tags, "required,tags") == nil {
+	if apiConfig.DataValidator.Var(params.Tags, "required,min=1,tags,dive,required,alpha") == nil {
 		updateBook.Tags = params.Tags
 	} else {
 		updateBook.Tags = existingInformation.Tags
