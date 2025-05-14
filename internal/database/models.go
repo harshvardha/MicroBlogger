@@ -21,7 +21,6 @@ type Blog struct {
 	ThumbnailUrl string
 	CodeRepoLink sql.NullString
 	Views        int32
-	Likes        int32
 	Author       uuid.UUID
 	Category     uuid.UUID
 	CreatedAt    time.Time

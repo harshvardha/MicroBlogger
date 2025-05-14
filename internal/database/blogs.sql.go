@@ -34,7 +34,7 @@ insert into blogs(
     NOW(),
     NOW()
 )
-returning id, title, brief, content_url, images, thumbnail_url, code_repo_link, views, likes, author, category, created_at, updated_at, tags
+returning id, title, brief, content_url, images, thumbnail_url, code_repo_link, views, author, category, created_at, updated_at, tags
 `
 
 type CreateBlogParams struct {
@@ -71,7 +71,6 @@ func (q *Queries) CreateBlog(ctx context.Context, arg CreateBlogParams) (Blog, e
 		&i.ThumbnailUrl,
 		&i.CodeRepoLink,
 		&i.Views,
-		&i.Likes,
 		&i.Author,
 		&i.Category,
 		&i.CreatedAt,
@@ -97,14 +96,14 @@ func (q *Queries) DislikeBlog(ctx context.Context, arg DislikeBlogParams) error 
 
 const getAllBlogsByCategory = `-- name: GetAllBlogsByCategory :many
 select 
-id, title, brief, thumbnail_url, views, likes,
-tags, created_at from blogs where category = $1 and id > $2 limit $3
+id, title, brief, thumbnail_url, views,
+tags, created_at from blogs where category = $1 and created_at < $2 limit $3
 `
 
 type GetAllBlogsByCategoryParams struct {
-	Category uuid.UUID
-	ID       uuid.UUID
-	Limit    int32
+	Category  uuid.UUID
+	CreatedAt time.Time
+	Limit     int32
 }
 
 type GetAllBlogsByCategoryRow struct {
@@ -113,13 +112,12 @@ type GetAllBlogsByCategoryRow struct {
 	Brief        string
 	ThumbnailUrl string
 	Views        int32
-	Likes        int32
 	Tags         []string
 	CreatedAt    time.Time
 }
 
 func (q *Queries) GetAllBlogsByCategory(ctx context.Context, arg GetAllBlogsByCategoryParams) ([]GetAllBlogsByCategoryRow, error) {
-	rows, err := q.db.QueryContext(ctx, getAllBlogsByCategory, arg.Category, arg.ID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, getAllBlogsByCategory, arg.Category, arg.CreatedAt, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +131,6 @@ func (q *Queries) GetAllBlogsByCategory(ctx context.Context, arg GetAllBlogsByCa
 			&i.Brief,
 			&i.ThumbnailUrl,
 			&i.Views,
-			&i.Likes,
 			pq.Array(&i.Tags),
 			&i.CreatedAt,
 		); err != nil {
@@ -153,7 +150,7 @@ func (q *Queries) GetAllBlogsByCategory(ctx context.Context, arg GetAllBlogsByCa
 const getBlogByID = `-- name: GetBlogByID :one
 select
 blogs.title, blogs.brief, blogs.content_url, blogs.images, blogs.thumbnail_url,
-blogs.code_repo_link, blogs.views, blogs.likes,
+blogs.code_repo_link, blogs.views,
 blogs.tags, users.username, blogs.created_at
 from blogs join users on blogs.author = users.id where blogs.id = $1
 `
@@ -166,7 +163,6 @@ type GetBlogByIDRow struct {
 	ThumbnailUrl string
 	CodeRepoLink sql.NullString
 	Views        int32
-	Likes        int32
 	Tags         []string
 	Username     string
 	CreatedAt    time.Time
@@ -183,7 +179,6 @@ func (q *Queries) GetBlogByID(ctx context.Context, id uuid.UUID) (GetBlogByIDRow
 		&i.ThumbnailUrl,
 		&i.CodeRepoLink,
 		&i.Views,
-		&i.Likes,
 		pq.Array(&i.Tags),
 		&i.Username,
 		&i.CreatedAt,
@@ -265,8 +260,7 @@ func (q *Queries) RemoveBlog(ctx context.Context, id uuid.UUID) error {
 const updateBlog = `-- name: UpdateBlog :one
 update blogs set
 title = $1, brief = $2, content_url = $3, images = $4,
-thumbnail_url = $5, code_repo_link = $6, tags = $7,
-category = $8, updated_at = NOW() where id = $9
+thumbnail_url = $5, code_repo_link = $6, tags = $7, updated_at = NOW() where id = $8
 returning created_at, updated_at
 `
 
@@ -278,7 +272,6 @@ type UpdateBlogParams struct {
 	ThumbnailUrl string
 	CodeRepoLink sql.NullString
 	Tags         []string
-	Category     uuid.UUID
 	ID           uuid.UUID
 }
 
@@ -296,7 +289,6 @@ func (q *Queries) UpdateBlog(ctx context.Context, arg UpdateBlogParams) (UpdateB
 		arg.ThumbnailUrl,
 		arg.CodeRepoLink,
 		pq.Array(arg.Tags),
-		arg.Category,
 		arg.ID,
 	)
 	var i UpdateBlogRow
