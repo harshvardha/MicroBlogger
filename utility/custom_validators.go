@@ -39,16 +39,22 @@ func GithubURLValidator(fl validator.FieldLevel) bool {
 
 func NoDuplicatesTagsValidator(fl validator.FieldLevel) bool {
 	tags, ok := fl.Field().Interface().([]string)
+	pattern := `^[a-zA-Z ]+$`
 	if !ok {
 		return false
 	}
 
 	seen := make(map[string]struct{})
 	for _, tag := range tags {
+		if tag == "" {
+			return false
+		}
 		if _, exists := seen[tag]; exists {
 			return false
 		}
-		seen[tag] = struct{}{}
+		if regexp.MustCompile(pattern).MatchString(tag) {
+			seen[tag] = struct{}{}
+		}
 	}
 	return true
 }
