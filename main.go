@@ -10,8 +10,10 @@ import (
 	"github.com/harshvardha/artOfSoftwareEngineering/controllers"
 	"github.com/harshvardha/artOfSoftwareEngineering/internal/cache"
 	"github.com/harshvardha/artOfSoftwareEngineering/internal/database"
+	"github.com/harshvardha/artOfSoftwareEngineering/middlewares"
 	"github.com/harshvardha/artOfSoftwareEngineering/utility"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -74,12 +76,63 @@ func main() {
 	// registering new custom password validator
 	dataValidator.RegisterValidation("password", utility.CustomPasswordValidator)
 
+	// registering new custom github url validator
+	dataValidator.RegisterValidation("github_url", utility.GithubURLValidator)
+
+	// registering new custom username validator
+	dataValidator.RegisterValidation("username", utility.UsernameValidator)
+
+	// registering new custom bookName validator
+	dataValidator.RegisterValidation("bookname", utility.BookNameValidator)
+
+	// registering new tags validator
+	dataValidator.RegisterValidation("tags", utility.NoDuplicatesTagsValidator)
+
 	// setting apiConfig
 	apiConfig := controllers.ApiConfig{
 		DB:            database.New(dbConnection),
 		JwtSecret:     jwtSecret,
 		OtpCache:      cache.NewOTPCache(fromEmail, emailSubject, emailBody, smtpHost, smtpPort, appPassword),
 		DataValidator: dataValidator,
+	}
+
+	routes := map[string][]string{
+		"user": {
+			"/api/v1/book/filter",
+			"/api/v1/book/all",
+			"/api/v1/book/review",
+			"/api/v1/user/update/email",
+			"/api/v1/user/update/password",
+			"/api/v1/user/update/other",
+			"/api/v1/user/account/remove",
+			"/api/v1/user",
+			"/api/v1/blog/view/increment",
+			"/api/v1/blog/likedislike",
+			"/api/v1/blog",
+			"/api/v1/blog/category",
+			"/api/v1/comment/create",
+			"/api/v1/comment/update",
+			"/api/v1/comment/remove",
+			"/api/v1/comment/all",
+		},
+		"nil_IDAndRole": {
+			"/api/v1/book/add",
+			"/api/v1/book/review",
+			"/api/v1/book/all",
+			"/api/v1/book/filter",
+			"/api/v1/book/update",
+			"/api/v1/book/remove",
+			"/api/v1/blog/update",
+			"/api/v1/blog/remove",
+			"/api/v1/blog/category",
+			"/api/v1/blog/view/increment",
+			"/api/v1/comment/all",
+		},
+		"nil_accessToken": {
+			"/api/v1/user/update/email",
+			"/api/v1/user/update/password",
+			"/api/v1/user/account/remove",
+		},
 	}
 
 	// creating new request redirecting multiplexer
@@ -97,6 +150,42 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/register", apiConfig.HandleRegisterUser)
 	mux.HandleFunc("GET /api/v1/auth/otp/resend", apiConfig.HandleResendOTP)
 	mux.HandleFunc("POST /api/v1/auth/login", apiConfig.HandleLogin)
+
+	// api endpoints for books
+	mux.HandleFunc("POST /api/v1/book/add", middlewares.ValidateJWT(apiConfig.HandleAddBook, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("PUT /api/v1/book/update", middlewares.ValidateJWT(apiConfig.HandleUpdateBook, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("DELETE /api/v1/book/remove", middlewares.ValidateJWT(apiConfig.HandleRemoveBook, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("GET /api/v1/book/filter", middlewares.ValidateJWT(apiConfig.HandleFilterBooksByLevel, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("GET /api/v1/book/all", middlewares.ValidateJWT(apiConfig.HandleGetAllBooks, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("GET /api/v1/book/review", middlewares.ValidateJWT(apiConfig.HandleGetReviewByBookID, apiConfig.JwtSecret, apiConfig.DB, routes))
+
+	// api endpoints for user
+	mux.HandleFunc("PUT /api/v1/user/update/email", middlewares.ValidateJWT(apiConfig.HandleUpdateEmail, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("PUT /api/v1/user/update/password", middlewares.ValidateJWT(apiConfig.HandleUpdatePassword, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("PUT /api/v1/user/update/other", middlewares.ValidateJWT(apiConfig.HandleUpdateOtherDetails, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("DELETE /api/v1/user/account/remove", middlewares.ValidateJWT(apiConfig.HandleRemoveUserAccount, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("GET /api/v1/user", middlewares.ValidateJWT(apiConfig.HandleGetUserByID, apiConfig.JwtSecret, apiConfig.DB, routes))
+
+	// api endpoints for category
+	mux.HandleFunc("POST /api/v1/category/create", middlewares.ValidateJWT(apiConfig.HandleCreateCategory, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("PUT /api/v1/category/update", middlewares.ValidateJWT(apiConfig.HandleUpdateCategory, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("DELETE /api/v1/category/remove", middlewares.ValidateJWT(apiConfig.HandleRemoveCategory, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("GET /api/v1/category/all", middlewares.ValidateJWT(apiConfig.HandleGetAllCategories, apiConfig.JwtSecret, apiConfig.DB, routes))
+
+	// api endpoints for blogs
+	mux.HandleFunc("POST /api/v1/blog/create", middlewares.ValidateJWT(apiConfig.HandleCreateBlog, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("PUT /api/v1/blog/update", middlewares.ValidateJWT(apiConfig.HandleUpdateBlog, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("DELETE /api/v1/blog/remove", middlewares.ValidateJWT(apiConfig.HandleRemoveBlog, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("GET /api/v1/blog/category", middlewares.ValidateJWT(apiConfig.HandleGetBlogsByCategory, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("GET /api/v1/blog", middlewares.ValidateJWT(apiConfig.HandleGetBlogByID, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("PUT /api/v1/blog/likedislike", middlewares.ValidateJWT(apiConfig.HandleLikeOrDislike, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("PUT /api/v1/blog/views/increment", middlewares.ValidateJWT(apiConfig.HandleIncrementView, apiConfig.JwtSecret, apiConfig.DB, routes))
+
+	// api endpoints for comments
+	mux.HandleFunc("POST /api/v1/comment/create", middlewares.ValidateJWT(apiConfig.HandleCreateComment, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("PUT /api/v1/comment/update", middlewares.ValidateJWT(apiConfig.HandleUpdateComment, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("DELETE /api/v1/comment/remove", middlewares.ValidateJWT(apiConfig.HandleRemoveComment, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("GET /api/v1/comment/all", middlewares.ValidateJWT(apiConfig.HandleGetAllCommentsByBlogID, apiConfig.JwtSecret, apiConfig.DB, routes))
 
 	// starting the server
 	server := &http.Server{
