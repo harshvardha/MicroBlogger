@@ -105,6 +105,7 @@ func main() {
 			"/api/v1/user/update/password",
 			"/api/v1/user/update/other",
 			"/api/v1/user/account/remove",
+			"/api/v1/user/search",
 			"/api/v1/user",
 			"/api/v1/blog/view/increment",
 			"/api/v1/blog/likedislike",
@@ -165,6 +166,7 @@ func main() {
 	mux.HandleFunc("PUT /api/v1/user/update/other", middlewares.ValidateJWT(apiConfig.HandleUpdateOtherDetails, apiConfig.JwtSecret, apiConfig.DB, routes))
 	mux.HandleFunc("DELETE /api/v1/user/account/remove", middlewares.ValidateJWT(apiConfig.HandleRemoveUserAccount, apiConfig.JwtSecret, apiConfig.DB, routes))
 	mux.HandleFunc("GET /api/v1/user", middlewares.ValidateJWT(apiConfig.HandleGetUserByID, apiConfig.JwtSecret, apiConfig.DB, routes))
+	mux.HandleFunc("GET /api/v1/user/search", middlewares.ValidateJWT(apiConfig.HandleUserSearch, apiConfig.JwtSecret, apiConfig.DB, routes))
 
 	// api endpoints for category
 	mux.HandleFunc("POST /api/v1/category/create", middlewares.ValidateJWT(apiConfig.HandleCreateCategory, apiConfig.JwtSecret, apiConfig.DB, routes))
