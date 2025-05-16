@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const createUser = `-- name: CreateUser :exec
@@ -119,6 +120,170 @@ delete from users where id = $1
 func (q *Queries) RemoveUser(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, removeUser, id)
 	return err
+}
+
+const searchBlogsByTags = `-- name: SearchBlogsByTags :many
+select id, title, brief, thumbnail_url, views from blogs
+where tags && $1
+`
+
+type SearchBlogsByTagsRow struct {
+	ID           uuid.UUID
+	Title        string
+	Brief        string
+	ThumbnailUrl string
+	Views        int32
+}
+
+func (q *Queries) SearchBlogsByTags(ctx context.Context, tags []string) ([]SearchBlogsByTagsRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchBlogsByTags, pq.Array(tags))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchBlogsByTagsRow
+	for rows.Next() {
+		var i SearchBlogsByTagsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Brief,
+			&i.ThumbnailUrl,
+			&i.Views,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchBlogsByTitle = `-- name: SearchBlogsByTitle :many
+select id, title, brief, thumbnail_url, views from blogs
+where title ilike $1 or title ilike $2 or title ilike $3
+`
+
+type SearchBlogsByTitleParams struct {
+	Title   string
+	Title_2 string
+	Title_3 string
+}
+
+type SearchBlogsByTitleRow struct {
+	ID           uuid.UUID
+	Title        string
+	Brief        string
+	ThumbnailUrl string
+	Views        int32
+}
+
+func (q *Queries) SearchBlogsByTitle(ctx context.Context, arg SearchBlogsByTitleParams) ([]SearchBlogsByTitleRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchBlogsByTitle, arg.Title, arg.Title_2, arg.Title_3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchBlogsByTitleRow
+	for rows.Next() {
+		var i SearchBlogsByTitleRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Brief,
+			&i.ThumbnailUrl,
+			&i.Views,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchBooksByTags = `-- name: SearchBooksByTags :many
+select id, name, cover_image_url from books
+where tags && $1
+`
+
+type SearchBooksByTagsRow struct {
+	ID            uuid.UUID
+	Name          string
+	CoverImageUrl string
+}
+
+func (q *Queries) SearchBooksByTags(ctx context.Context, tags []string) ([]SearchBooksByTagsRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchBooksByTags, pq.Array(tags))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchBooksByTagsRow
+	for rows.Next() {
+		var i SearchBooksByTagsRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.CoverImageUrl); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchBooksByTitle = `-- name: SearchBooksByTitle :many
+select id, name, cover_image_url from books
+where name ilike $1 and name ilike $2 and name ilike $3
+`
+
+type SearchBooksByTitleParams struct {
+	Name   string
+	Name_2 string
+	Name_3 string
+}
+
+type SearchBooksByTitleRow struct {
+	ID            uuid.UUID
+	Name          string
+	CoverImageUrl string
+}
+
+func (q *Queries) SearchBooksByTitle(ctx context.Context, arg SearchBooksByTitleParams) ([]SearchBooksByTitleRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchBooksByTitle, arg.Name, arg.Name_2, arg.Name_3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchBooksByTitleRow
+	for rows.Next() {
+		var i SearchBooksByTitleRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.CoverImageUrl); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateEmail = `-- name: UpdateEmail :exec

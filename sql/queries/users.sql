@@ -41,3 +41,19 @@ select exists(select 1 from users where email = $1);
 
 -- name: GetUserByEmailID :one
 select users.id, users.username, users.profile_pic_url, users.password, roles.role_name from users join roles on users.role_id = roles.id where users.email = $1;
+
+-- name: SearchBlogsByTitle :many
+select id, title, brief, thumbnail_url, views from blogs
+where title ilike $1 or title ilike $2 or title ilike $3;
+
+-- name: SearchBlogsByTags :many
+select id, title, brief, thumbnail_url, views from blogs
+where tags && $1;
+
+-- name: SearchBooksByTitle :many
+select id, name, cover_image_url from books
+where name ilike $1 and name ilike $2 and name ilike $3;
+
+-- name: SearchBooksByTags :many
+select id, name, cover_image_url from books
+where tags && $1;

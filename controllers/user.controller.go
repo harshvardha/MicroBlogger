@@ -3,9 +3,11 @@ package controllers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/harshvardha/artOfSoftwareEngineering/internal/database"
+	"github.com/harshvardha/artOfSoftwareEngineering/internal/search"
 	"github.com/harshvardha/artOfSoftwareEngineering/utility"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -216,5 +218,47 @@ func (apiConfig *ApiConfig) HandleGetUserByID(w http.ResponseWriter, r *http.Req
 		AccessToken:   newAccessToken,
 		CreatedAt:     user.CreatedAt,
 		UpdatedAt:     user.UpdatedAt,
+	})
+}
+
+func (apiConfig *ApiConfig) HandleUserSearch(w http.ResponseWriter, r *http.Request, IDAndRole *IDAndRole, newAccessToken string) {
+	// extracting user search query
+	searchQuery := r.URL.Query().Get("search")
+	if searchQuery == "" {
+		utility.RespondWithError(w, http.StatusBadRequest, "empty search query")
+		return
+	}
+
+	// tokenizing the search query
+	searchTokens := strings.Split(searchQuery, " ")
+	if len(searchTokens) == 0 {
+		utility.RespondWithError(w, http.StatusBadRequest, "empty search query")
+		return
+	}
+
+	// removing duplicates
+	uniqueTokens := make(map[string]struct{})
+	for _, token := range strings.Split(searchQuery, " ") {
+		if _, ok := uniqueTokens[token]; !ok {
+			uniqueTokens[token] = struct{}{}
+		}
+	}
+	var tokens []string
+	for token := range uniqueTokens {
+		tokens = append(tokens, token)
+	}
+
+	// sending uniqueTokens to search
+	blogs, books := search.Search(tokens, r.Context(), apiConfig.DB)
+	type Results struct {
+		Blogs       []*search.Blog `json:"blogs"`
+		Books       []*search.Book `json:"books"`
+		AccessToken string         `json:"accessToken"`
+	}
+
+	utility.RespondWithJson(w, http.StatusOK, Results{
+		Blogs:       blogs,
+		Books:       books,
+		AccessToken: newAccessToken,
 	})
 }
